@@ -6,6 +6,7 @@ Rich-based TUI front-end.
 import csv
 import glob as _glob
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -20,6 +21,7 @@ from .classifier import cluster_events
 from .detector import detect_events, load_audio
 from .features import extract_event_features
 from .models import AudioEvent
+from .report import generate_report
 
 console = Console()
 
@@ -91,17 +93,18 @@ class SubnAudio:
         self._status_bar()
         console.print(Panel(
             "\n".join([
-                "  [bold][1][/bold] Add WAV files",
+                "  [bold][1][/bold] Add audio files",
                 "  [bold][2][/bold] Analyze  [dim](detect events + extract features + classify)[/dim]",
                 "  [bold][3][/bold] View results",
-                "  [bold][4][/bold] Export results to CSV",
-                "  [bold][5][/bold] Settings",
+                "  [bold][4][/bold] Generate report  [dim](HTML with spectrograms per cluster)[/dim]",
+                "  [bold][5][/bold] Export results to CSV",
+                "  [bold][6][/bold] Settings",
                 "  [bold][q][/bold] Quit",
             ]),
             title="[bold cyan]Main Menu[/bold cyan]",
             expand=False,
         ))
-        return Prompt.ask("\nChoice", choices=["1", "2", "3", "4", "5", "q"])
+        return Prompt.ask("\nChoice", choices=["1", "2", "3", "4", "5", "6", "q"])
 
     # ------------------------------------------------------------------ Actions
 
@@ -115,8 +118,10 @@ class SubnAudio:
             elif choice == "3":
                 self._view_results()
             elif choice == "4":
-                self._export_results()
+                self._generate_report()
             elif choice == "5":
+                self._export_results()
+            elif choice == "6":
                 self._edit_settings()
             elif choice == "q":
                 console.print("\n[bold cyan]🌊  Goodbye![/bold cyan]\n")
@@ -302,6 +307,44 @@ class SubnAudio:
             console.print(f"\n[dim]Total events: {len(self.events)} "
                           f"| Clusters: {len([k for k in clusters if k is not None and k >= 0])}[/dim]")
 
+        Prompt.ask("\nPress Enter to continue", default="")
+
+    # ------------------------------------------------------------------ Report
+
+    def _generate_report(self) -> None:
+        self._header()
+        if not self.events:
+            console.print("[yellow]No events yet. Run Analyze first.[/yellow]")
+            Prompt.ask("\nPress Enter to continue", default="")
+            return
+        if not self.classified:
+            console.print("[yellow]Events not yet classified. Run Analyze first.[/yellow]")
+            Prompt.ask("\nPress Enter to continue", default="")
+            return
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        default_dir = f"subnaudio_report_{timestamp}"
+        out_dir = Path(Prompt.ask("Output directory", default=default_dir))
+
+        console.print(f"\nGenerating spectrograms for [bold]{len(self.events)}[/bold] event(s)…")
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Rendering spectrograms…", total=len(self.events))
+
+            index_path = generate_report(
+                self.events,
+                out_dir,
+                progress_cb=lambda done, total: progress.update(task, completed=done),
+            )
+
+        console.print(f"\n[green]✓ Report saved to[/green] [cyan]{index_path.resolve()}[/cyan]")
+        console.print(f"  Open in a browser: [dim]open {index_path.resolve()}[/dim]")
         Prompt.ask("\nPress Enter to continue", default="")
 
     # ------------------------------------------------------------------ Export
