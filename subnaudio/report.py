@@ -46,8 +46,13 @@ def _render_spectrogram(
     accent: str = "#22d3ee",
     fig_w: float = 4.5,
     fig_h: float = 2.8,
+    return_bytes: bool = False,
 ) -> str:
-    """Render a mel spectrogram and return it as a base64 PNG data URI."""
+    """Render a mel spectrogram.
+
+    Returns a base64 PNG data URI by default, or raw PNG bytes when
+    ``return_bytes=True`` (useful for ``st.image()`` in Streamlit).
+    """
     fig, ax = plt.subplots(figsize=(fig_w, fig_h), facecolor="#0f172a")
     ax.set_facecolor("#0f172a")
 
@@ -82,7 +87,10 @@ def _render_spectrogram(
                 facecolor=fig.get_facecolor())
     plt.close(fig)
     buf.seek(0)
-    return "data:image/png;base64," + base64.b64encode(buf.read()).decode()
+    raw = buf.read()
+    if return_bytes:
+        return raw
+    return "data:image/png;base64," + base64.b64encode(raw).decode()
 
 
 # ── HTML generation ──────────────────────────────────────────────────────────

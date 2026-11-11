@@ -12,6 +12,7 @@ class AudioEvent:
     duration: float    # seconds
     features: Optional[np.ndarray] = field(default=None, repr=False)
     cluster_id: Optional[int] = None
+    event_id: Optional[int] = None  # assigned during session save/load
 
     @property
     def label(self) -> str:

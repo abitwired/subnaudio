@@ -5,6 +5,8 @@ Rich-based TUI front-end.
 
 import csv
 import glob as _glob
+import os
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -22,6 +24,7 @@ from .detector import detect_events, load_audio
 from .features import extract_event_features
 from .models import AudioEvent
 from .report import generate_report
+from .session import save_session
 
 console = Console()
 
@@ -97,14 +100,15 @@ class SubnAudio:
                 "  [bold][2][/bold] Analyze  [dim](detect events + extract features + classify)[/dim]",
                 "  [bold][3][/bold] View results",
                 "  [bold][4][/bold] Generate report  [dim](HTML with spectrograms per cluster)[/dim]",
-                "  [bold][5][/bold] Export results to CSV",
-                "  [bold][6][/bold] Settings",
+                "  [bold][5][/bold] Launch Explorer  [dim](interactive browser UI with annotations)[/dim]",
+                "  [bold][6][/bold] Export results to CSV",
+                "  [bold][7][/bold] Settings",
                 "  [bold][q][/bold] Quit",
             ]),
             title="[bold cyan]Main Menu[/bold cyan]",
             expand=False,
         ))
-        return Prompt.ask("\nChoice", choices=["1", "2", "3", "4", "5", "6", "q"])
+        return Prompt.ask("\nChoice", choices=["1", "2", "3", "4", "5", "6", "7", "q"])
 
     # ------------------------------------------------------------------ Actions
 
@@ -120,8 +124,10 @@ class SubnAudio:
             elif choice == "4":
                 self._generate_report()
             elif choice == "5":
-                self._export_results()
+                self._launch_explorer()
             elif choice == "6":
+                self._export_results()
+            elif choice == "7":
                 self._edit_settings()
             elif choice == "q":
                 console.print("\n[bold cyan]🌊  Goodbye![/bold cyan]\n")
@@ -263,6 +269,14 @@ class SubnAudio:
                 tbl.add_row(f"[{colour}]{label}[/{colour}]", str(count))
             console.print(tbl)
 
+            # Auto-save session for the Explorer
+            session_path = Path("subnaudio_session.json")
+            try:
+                save_session(self.events, session_path)
+                console.print(f"\n[dim]Session saved → {session_path}  (use [5] Launch Explorer)[/dim]")
+            except Exception as exc:
+                console.print(f"[yellow]Could not save session: {exc}[/yellow]")
+
         Prompt.ask("\nPress Enter to continue", default="")
 
     # ------------------------------------------------------------------ View results
@@ -345,6 +359,56 @@ class SubnAudio:
 
         console.print(f"\n[green]✓ Report saved to[/green] [cyan]{index_path.resolve()}[/cyan]")
         console.print(f"  Open in a browser: [dim]open {index_path.resolve()}[/dim]")
+        Prompt.ask("\nPress Enter to continue", default="")
+
+    # ------------------------------------------------------------------ Explorer
+
+    def _launch_explorer(self) -> None:
+        self._header()
+        if not self.events:
+            console.print("[yellow]No events yet. Run Analyze first.[/yellow]")
+            Prompt.ask("\nPress Enter to continue", default="")
+            return
+        if not self.classified:
+            console.print("[yellow]Events not yet classified. Run Analyze first.[/yellow]")
+            Prompt.ask("\nPress Enter to continue", default="")
+            return
+
+        session_path = Path("subnaudio_session.json").resolve()
+        try:
+            save_session(self.events, session_path)
+        except Exception as exc:
+            console.print(f"[red]Could not save session:[/red] {exc}")
+            Prompt.ask("\nPress Enter to continue", default="")
+            return
+
+        explorer_script = Path(__file__).parent / "explorer.py"
+        env = {**os.environ, "SUBNAUDIO_SESSION": str(session_path)}
+
+        console.print(Panel(
+            f"Starting Acoustic Event Explorer…\n\n"
+            f"  [bold cyan]http://localhost:8501[/bold cyan]\n\n"
+            f"  Session: [dim]{session_path}[/dim]\n\n"
+            f"  Press [bold]Ctrl+C[/bold] in this terminal to stop the explorer\n"
+            f"  and return to the menu.",
+            title="[bold cyan]Launching Explorer[/bold cyan]",
+            expand=False,
+        ))
+
+        try:
+            proc = subprocess.Popen(
+                [sys.executable, "-m", "streamlit", "run", str(explorer_script),
+                 "--server.headless", "false", "--browser.gatherUsageStats", "false"],
+                env=env,
+            )
+            proc.wait()
+        except KeyboardInterrupt:
+            proc.terminate()
+            proc.wait()
+        except FileNotFoundError:
+            console.print("[red]streamlit not found.[/red] Install it: [cyan]pip install streamlit[/cyan]")
+
+        console.print("\n[dim]Explorer stopped. Returning to menu.[/dim]")
         Prompt.ask("\nPress Enter to continue", default="")
 
     # ------------------------------------------------------------------ Export
