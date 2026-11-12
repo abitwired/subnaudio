@@ -67,8 +67,9 @@ class SubnAudio:
         self.classified = False
         self.settings = {
             "top_db": 40.0,
-            "min_duration": 0.1,
+            "min_duration": 0.5,
             "merge_gap": 0.5,
+            "max_duration": 10.0,
             "cluster_method": "auto",
             "dbscan_eps": None,  # None = auto-compute from data
             "dbscan_min_samples": 2,
@@ -215,6 +216,7 @@ class SubnAudio:
                         top_db=self.settings["top_db"],
                         min_duration=self.settings["min_duration"],
                         merge_gap=self.settings["merge_gap"],
+                        max_duration=self.settings["max_duration"],
                     )
                     if events:
                         feat_task = progress.add_task(
@@ -452,11 +454,12 @@ class SubnAudio:
                 f"  [bold][1][/bold] Silence threshold (top_db)      [cyan]{s['top_db']} dB[/cyan]",
                 f"  [bold][2][/bold] Min event duration               [cyan]{s['min_duration']} s[/cyan]",
                 f"  [bold][3][/bold] Merge gap                        [cyan]{s['merge_gap']} s[/cyan]",
+                f"  [bold][4][/bold] Max event duration               [cyan]{s['max_duration']} s[/cyan]  [dim](longer segments are onset-split)[/dim]",
                 "",
-                f"  [bold][4][/bold] Clustering method                [cyan]{s['cluster_method']}[/cyan]  [dim](auto/agglomerative/kmeans/dbscan)[/dim]",
-                f"  [bold][5][/bold] DBSCAN epsilon (0 = auto)         [cyan]{s['dbscan_eps'] or 'auto'}[/cyan]",
-                f"  [bold][6][/bold] DBSCAN min samples               [cyan]{s['dbscan_min_samples']}[/cyan]",
-                f"  [bold][7][/bold] Fixed cluster count (0 = auto)   [cyan]{s['n_clusters'] or 'auto'}[/cyan]",
+                f"  [bold][5][/bold] Clustering method                [cyan]{s['cluster_method']}[/cyan]  [dim](auto/agglomerative/kmeans/dbscan)[/dim]",
+                f"  [bold][6][/bold] DBSCAN epsilon (0 = auto)         [cyan]{s['dbscan_eps'] or 'auto'}[/cyan]",
+                f"  [bold][7][/bold] DBSCAN min samples               [cyan]{s['dbscan_min_samples']}[/cyan]",
+                f"  [bold][8][/bold] Fixed cluster count (0 = auto)   [cyan]{s['n_clusters'] or 'auto'}[/cyan]",
                 "",
                 "  [bold][b][/bold] Back",
             ]),
@@ -464,7 +467,7 @@ class SubnAudio:
             expand=False,
         ))
 
-        choice = Prompt.ask("\nChoice", choices=["1", "2", "3", "4", "5", "6", "7", "b"])
+        choice = Prompt.ask("\nChoice", choices=["1", "2", "3", "4", "5", "6", "7", "8", "b"])
 
         if choice == "1":
             s["top_db"] = FloatPrompt.ask("Silence threshold (dB below peak)", default=s["top_db"])
@@ -473,14 +476,16 @@ class SubnAudio:
         elif choice == "3":
             s["merge_gap"] = FloatPrompt.ask("Merge gap (seconds)", default=s["merge_gap"])
         elif choice == "4":
+            s["max_duration"] = FloatPrompt.ask("Max event duration (seconds)", default=s["max_duration"])
+        elif choice == "5":
             method = Prompt.ask("Clustering method", choices=["auto", "agglomerative", "kmeans", "dbscan"], default=s["cluster_method"])
             s["cluster_method"] = method
-        elif choice == "5":
+        elif choice == "6":
             eps = FloatPrompt.ask("DBSCAN epsilon (0 = auto)", default=s["dbscan_eps"] or 0.0)
             s["dbscan_eps"] = None if eps == 0.0 else eps
-        elif choice == "6":
-            s["dbscan_min_samples"] = IntPrompt.ask("DBSCAN min samples", default=s["dbscan_min_samples"])
         elif choice == "7":
+            s["dbscan_min_samples"] = IntPrompt.ask("DBSCAN min samples", default=s["dbscan_min_samples"])
+        elif choice == "8":
             k = IntPrompt.ask("Fixed cluster count (0 = auto)", default=s["n_clusters"] or 0)
             s["n_clusters"] = None if k == 0 else k
         # 'b' — fall through, return to menu

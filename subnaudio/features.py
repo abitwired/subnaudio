@@ -38,9 +38,13 @@ def _window_coeff_stats(wins: list) -> List[float]:
 def _extract_window(y: np.ndarray, sr: int) -> dict:
     """Extract all raw feature matrices from a single audio segment."""
     mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=N_MFCC)
+    # delta width must be odd and <= number of frames; minimum useful width is 3
+    delta_width = max(3, min(9, (mfcc.shape[1] // 2) * 2 - 1))
+    delta_width = delta_width if delta_width % 2 == 1 else delta_width - 1
+    delta_width = max(3, delta_width)
     return {
         "mfcc": np.mean(mfcc, axis=1),
-        "delta_mfcc": np.mean(librosa.feature.delta(mfcc), axis=1),
+        "delta_mfcc": np.mean(librosa.feature.delta(mfcc, width=delta_width), axis=1),
         "contrast": np.mean(
             librosa.feature.spectral_contrast(
                 y=y, sr=sr, n_bands=N_CONTRAST_BANDS, fmin=CONTRAST_FMIN

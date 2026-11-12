@@ -1,6 +1,7 @@
 *.csv
 .DS_Store
 subnaudio_report*
+subnaudio_session*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

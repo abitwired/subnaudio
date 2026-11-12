@@ -211,8 +211,9 @@ Choose **[6]** to write all events and cluster assignments to a CSV file.
 | Setting | Default | Description |
 |---|---|---|
 | Silence threshold (top_db) | `40 dB` | Frames more than this many dB below the peak are treated as silence |
-| Min event duration | `0.1 s` | Events shorter than this are discarded |
+| Min event duration | `0.5 s` | Events shorter than this are discarded |
 | Merge gap | `0.5 s` | Adjacent events closer than this are merged |
+| Max event duration | `10.0 s` | Events longer than this are sub-split using onset detection |
 | Clustering method | `auto` | `auto` (agglomerative for N<30, K-Means otherwise), `agglomerative`, `kmeans`, `dbscan` |
 | DBSCAN epsilon | `auto` | Neighbourhood radius — auto-computed via k-distance elbow method |
 | DBSCAN min samples | `2` | Minimum events required to form a cluster |
