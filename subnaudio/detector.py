@@ -88,32 +88,66 @@ def detect_events(
     min_duration: float = 0.5,
     merge_gap: float = 0.5,
     max_duration: float = 10.0,
+    chunk_size: float = 0.0,
 ) -> List[AudioEvent]:
     """
     Detect acoustic events in an audio file.
 
-    Two-stage strategy:
-      1. Silence-based splitting (librosa.effects.split) to find non-silent
-         regions — works well for recordings with clear silence gaps.
-      2. Onset-based sub-segmentation — any region longer than ``max_duration``
-         is further split using onset detection so that distinct calls within a
-         continuous segment become separate events.
+    Two modes:
+
+    **Fixed-chunk mode** (``chunk_size > 0``):
+        Ignores silence detection entirely. Splits the file into equal-length
+        non-overlapping segments of exactly ``chunk_size`` seconds (the final
+        chunk may be shorter and is kept only if ≥ ``min_duration``).
+        Use this when you want uniform classification windows regardless of
+        acoustic content — e.g. 5 s segments matching a dataset like ESC-50.
+
+    **Silence-based mode** (``chunk_size == 0``, default):
+        Two-stage strategy:
+          1. Silence-based splitting (librosa.effects.split) to find non-silent
+             regions — works well for recordings with clear silence gaps.
+          2. Onset-based sub-segmentation — any region longer than
+             ``max_duration`` is further split using onset detection so that
+             distinct calls within a continuous segment become separate events.
 
     Args:
         y: Audio samples.
         sr: Sample rate.
         file_path: Source file path (stored on each event).
-        top_db: Silence threshold in dB below peak.
+        top_db: Silence threshold in dB below peak (silence-based mode only).
         min_duration: Discard events shorter than this (seconds).
-        merge_gap: Merge consecutive events separated by less than this (seconds).
-        max_duration: Split events longer than this using onset detection (seconds).
+        merge_gap: Merge consecutive events separated by less than this
+                   (silence-based mode only).
+        max_duration: Split events longer than this using onset detection
+                      (silence-based mode only).
+        chunk_size: If > 0, enable fixed-chunk mode: split audio into
+                    non-overlapping windows of this many seconds.
 
     Returns:
         List of AudioEvent objects.
     """
     total_duration = len(y) / sr
 
-    # ── Stage 1: silence-based split ────────────────────────────────────────
+    # ── Fixed-chunk mode ─────────────────────────────────────────────────────
+    if chunk_size > 0:
+        final_segments: List[Tuple[float, float]] = []
+        t = 0.0
+        while t < total_duration:
+            end = min(t + chunk_size, total_duration)
+            if end - t >= min_duration:
+                final_segments.append((t, end))
+            t += chunk_size
+        return [
+            AudioEvent(
+                file_path=file_path,
+                start_time=s,
+                end_time=e,
+                duration=e - s,
+            )
+            for s, e in final_segments
+        ]
+
+    # ── Silence-based mode ───────────────────────────────────────────────────
     intervals = librosa.effects.split(y, top_db=top_db)
 
     raw: List[Tuple[float, float]] = []
@@ -136,14 +170,13 @@ def detect_events(
         merged = [[0.0, total_duration]]
 
     # ── Stage 2: onset-based sub-segmentation for long segments ─────────────
-    final_segments: List[Tuple[float, float]] = []
+    final_segments = []
     for start, end in merged:
         dur = end - start
         if dur <= max_duration:
             if dur >= min_duration:
                 final_segments.append((start, end))
         else:
-            # Extract this region and sub-segment it
             seg_y = y[int(start * sr): int(end * sr)]
             sub_segs = _split_by_onsets(
                 seg_y, sr,

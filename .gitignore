@@ -2,6 +2,8 @@
 .DS_Store
 subnaudio_report*
 subnaudio_session*
+subnaudio_*
+ESC-50
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

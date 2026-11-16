@@ -23,6 +23,16 @@ dependencies = [
     "pandas>=2.0.0",
 ]
 
+[project.optional-dependencies]
+panns = [
+    "panns-inference>=0.1.0",
+    "torch>=2.0.0",
+]
+all = [
+    "panns-inference>=0.1.0",
+    "torch>=2.0.0",
+]
+
 [project.scripts]
 subnaudio = "subnaudio.main:main"
 

@@ -13,6 +13,8 @@ class AudioEvent:
     features: Optional[np.ndarray] = field(default=None, repr=False)
     cluster_id: Optional[int] = None
     event_id: Optional[int] = None  # assigned during session save/load
+    predicted_label: Optional[str] = None      # set after model training
+    model_confidence: Optional[float] = None   # prediction probability [0..1]
 
     @property
     def label(self) -> str:

@@ -1,11 +1,14 @@
 """Acoustic feature extraction for audio events."""
 
-from typing import List, Callable, Optional
+from typing import TYPE_CHECKING, List, Callable, Optional
 
 import librosa
 import numpy as np
 
 from .models import AudioEvent
+
+if TYPE_CHECKING:
+    from .extractors import FeatureExtractor
 
 N_MFCC = 20
 N_CONTRAST_BANDS = 4   # safe for sr as low as 8000 Hz
@@ -107,13 +110,24 @@ def extract_event_features(
     y: np.ndarray,
     sr: int,
     progress: Optional[Callable[[int, int], None]] = None,
+    extractor: "Optional[FeatureExtractor]" = None,
 ) -> List[AudioEvent]:
-    """Populate the `features` field on each AudioEvent in-place."""
+    """
+    Populate the `features` field on each AudioEvent in-place.
+
+    Args:
+        extractor: A FeatureExtractor instance.  Defaults to MFCCExtractor
+                   (the original 200-dim handcrafted extractor).
+    """
+    if extractor is None:
+        from .extractors import MFCCExtractor
+        extractor = MFCCExtractor()
+
     for i, event in enumerate(events):
         start = int(event.start_time * sr)
         end = int(event.end_time * sr)
         segment = y[start:end]
-        event.features = extract_features(segment, sr)
+        event.features = extractor.extract(segment, sr)
         if progress:
             progress(i + 1, len(events))
     return events
